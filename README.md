@@ -37,8 +37,8 @@ Make sure you have the following software installed on your system:
 ### 2. Clone the Repository
 
 ```bash
-git clone https://github.com/Bojom/WarehouseSystem.git
-cd WarehouseSystem
+git clone https://github.com/Bojom/Warehouse.git
+cd Warehouse
 ```
 ### 3. Backend setup
 Navigate to the backend directory
