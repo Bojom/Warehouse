@@ -167,8 +167,72 @@ router.get('/summary', protect, async (req, res) => {
 // GET /api/transactions/export
 router.get('/export', protect, async (req, res) => {
   try {
-    const { partId, userId, type, startDate, endDate } = req.query;
+    const { partId, userId, type, startDate, endDate, locale = 'zh' } = req.query;
+    console.log('Received locale parameter:', locale); // Debug log
     const trans_type = type;
+
+    // Translation mappings
+    const translations = {
+      zh: {
+        fileName: '出入库记录',
+        worksheetName: '出入库记录',
+        headers: {
+          time: '操作时间',
+          partNumber: '配件编号',
+          partName: '配件名称',
+          type: '类型',
+          quantity: '数量',
+          user: '经手人',
+          remarks: '备注'
+        },
+        types: {
+          IN: '入库',
+          OUT: '出库',
+          ANOMALY: '异常',
+          UNKNOWN: '未知'
+        }
+      },
+      en: {
+        fileName: 'Transaction Records',
+        worksheetName: 'Transaction Records',
+        headers: {
+          time: 'Operation Time',
+          partNumber: 'Part Number',
+          partName: 'Part Name',
+          type: 'Type',
+          quantity: 'Quantity',
+          user: 'Operator',
+          remarks: 'Remarks'
+        },
+        types: {
+          IN: 'In',
+          OUT: 'Out',
+          ANOMALY: 'Anomaly',
+          UNKNOWN: 'Unknown'
+        }
+      },
+      fr: {
+        fileName: 'Dossiers de Transaction',
+        worksheetName: 'Dossiers de Transaction',
+        headers: {
+          time: 'Heure de l\'opération',
+          partNumber: 'Numéro de pièce',
+          partName: 'Nom de la pièce',
+          type: 'Type',
+          quantity: 'Quantité',
+          user: 'Opérateur',
+          remarks: 'Remarques'
+        },
+        types: {
+          IN: 'Entrée',
+          OUT: 'Sortie',
+          ANOMALY: 'Anomalie',
+          UNKNOWN: 'Inconnu'
+        }
+      }
+    };
+
+    const t = translations[locale] || translations.zh;
 
     const whereCondition = {};
     if (partId) {
@@ -193,13 +257,10 @@ router.get('/export', protect, async (req, res) => {
     });
 
     const getTypeText = (type) => {
-      if (type === 'IN') return '入库';
-      if (type === 'OUT') return '出库';
-      if (type === 'ANOMALY') return '异常';
-      return '未知';
+      return t.types[type] || t.types.UNKNOWN;
     };
 
-    let fileName = '出入库记录';
+    let fileName = t.fileName;
 
     if (partId) {
       const partIds = partId.split(',');
@@ -224,16 +285,16 @@ router.get('/export', protect, async (req, res) => {
     fileName += '.xlsx';
 
     const workbook = new excel.Workbook();
-    const worksheet = workbook.addWorksheet('出入库记录');
+    const worksheet = workbook.addWorksheet(t.worksheetName);
 
     worksheet.columns = [
-      { header: '操作时间', key: 'time', width: 25 },
-      { header: '配件编号', key: 'p_num', width: 20 },
-      { header: '配件名称', key: 'p_name', width: 30 },
-      { header: '类型', key: 'type', width: 10 },
-      { header: '数量', key: 'qty', width: 10 },
-      { header: '经手人', key: 'user', width: 15 },
-      { header: '备注', key: 'remarks', width: 40 },
+      { header: t.headers.time, key: 'time', width: 25 },
+      { header: t.headers.partNumber, key: 'p_num', width: 20 },
+      { header: t.headers.partName, key: 'p_name', width: 30 },
+      { header: t.headers.type, key: 'type', width: 10 },
+      { header: t.headers.quantity, key: 'qty', width: 10 },
+      { header: t.headers.user, key: 'user', width: 15 },
+      { header: t.headers.remarks, key: 'remarks', width: 40 },
     ];
 
     transactions.forEach((t_instance) => {

@@ -22,8 +22,8 @@ export const createTransaction = (data) => {
  * 导出交易记录为 Excel
  * @returns {Promise}
  */
-export const exportTransactions = (params) => {
-  const requestParams = { ...params }
+export const exportTransactions = (params, locale = 'zh') => {
+  const requestParams = { ...params, locale }
   if (requestParams.partIds && requestParams.partIds.length > 0) {
     requestParams.partId = requestParams.partIds.join(',')
   }

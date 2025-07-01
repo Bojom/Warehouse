@@ -106,7 +106,7 @@ import { getParts } from '@/api/part.api' // 引入配件API
 import { exportTransactions } from '@/api/transaction.api' // 引入导出API
 import BaseChart from '@/components/charts/BaseChart.vue'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 // --- utility functions ---
 const formatDateTime = (isoString) => {
@@ -255,7 +255,8 @@ const handleSearch = () => {
 
 const handleExport = async () => {
   try {
-    const response = await exportTransactions(queryParams)
+    console.log('Current locale:', locale.value) // Debug log
+    const response = await exportTransactions(queryParams, locale.value)
 
     const url = window.URL.createObjectURL(new Blob([response.data]))
     const link = document.createElement('a')
