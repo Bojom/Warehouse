@@ -25,12 +25,11 @@
         style="width: 100%; margin-top: 20px"
         border
       >
-        <el-table-column prop="part_number" :label="$t('inventory.part_number')" width="180" />
+        <el-table-column prop="part_number" :label="$t('inventory.part_number')" width="200" />
         <el-table-column prop="part_name" :label="$t('inventory.part_name')" width="200" />
-        <el-table-column prop="spec" :label="$t('inventory.spec')" />
-        <el-table-column prop="stock" :label="$t('inventory.current_stock')" align="center" />
-        <el-table-column prop="stock_min" :label="$t('inventory.min_stock')" align="center" />
-        <el-table-column prop="stock_max" :label="$t('inventory.max_stock')" align="center" />
+        <el-table-column prop="current_stock" :label="$t('inventory.current_stock')" width="150" />
+        <el-table-column prop="min_stock" :label="$t('inventory.min_stock')" width="150" />
+        <el-table-column prop="max_stock" :label="$t('inventory.max_stock')" width="150" />
         <el-table-column prop="Supplier.supplier_name" :label="$t('inventory.supplier')" />
         <el-table-column :label="$t('inventory.status')" align="center">
           <template #default="scope">

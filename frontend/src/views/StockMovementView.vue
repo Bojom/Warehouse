@@ -1,304 +1,177 @@
 <template>
   <div class="stock-movement-view">
     <el-card>
-      <el-tabs v-model="activeTab">
-        <!-- Tab 1: IN/OUT Registration -->
-        <el-tab-pane :label="$t('stock_movement.in_out_registration')" name="in-out">
-          <el-form
-            ref="formInOutRef"
-            :model="formInOut"
-            :rules="rulesInOut"
-            label-width="180px"
-            class="form-container"
-          >
-            <!-- 操作类型 -->
-            <el-form-item :label="$t('stock_movement.action_type')" prop="trans_type">
-              <el-radio-group v-model="formInOut.trans_type">
-                <el-radio-button :label="$t('stock_movement.out')" value="OUT" />
-                <el-radio-button :label="$t('stock_movement.in')" value="IN" />
-              </el-radio-group>
-            </el-form-item>
-
-            <!-- 配件信息 -->
-            <el-divider content-position="left">{{ $t('stock_movement.part_info') }}</el-divider>
-            <el-form-item :label="$t('stock_movement.part_number')" prop="part_id" class="left-align-label">
+      <div class="scanner-container">
+        <h2>{{ $t('stock_movement.scan_barcode') }}</h2>
               <el-input
-                ref="partNumberInputRef"
-                v-model="partNumberSearch"
-                :placeholder="$t('stock_movement.scan_placeholder')"
-                @keydown.enter.prevent="handlePartNumberInput"
-                :loading="isSearching"
+          ref="barcodeInputRef"
+          v-model="barcode"
+          :placeholder="$t('stock_movement.scan_or_enter')"
+          @keyup.enter="handleBarcodeScan"
                 clearable
+          class="barcode-input"
               >
-                <template #append>
-                  <el-button @click="handlePartNumberInput" :loading="isSearching">
+          <template #prepend>
                     <el-icon><Search /></el-icon>
-                  </el-button>
                 </template>
               </el-input>
-            </el-form-item>
-            <el-form-item :label="$t('stock_movement.part_name')">
-              <el-input :value="foundPartInOut?.part_name" disabled />
-            </el-form-item>
-            <el-form-item :label="$t('stock_movement.current_stock')">
-              <el-input :value="foundPartInOut?.stock" disabled />
-            </el-form-item>
+      </div>
 
-            <!-- 操作信息 -->
-            <el-divider content-position="left">{{ $t('stock_movement.operation_info') }}</el-divider>
-            <el-form-item :label="$t('stock_movement.quantity')" prop="quantity">
-              <el-input-number
-                ref="quantityInputRef"
-                v-model="formInOut.quantity"
-                :min="1"
-                @keydown.enter.prevent="handleSubmitInOut"
-              />
-            </el-form-item>
-            <el-form-item :label="$t('stock_movement.handler')">
-              <el-input :value="userStore.user?.username" disabled />
-            </el-form-item>
-            <el-form-item :label="$t('stock_movement.remarks')">
-              <el-input v-model="formInOut.remarks" type="textarea" :rows="3" />
-            </el-form-item>
+      <!-- Part Details & Transaction Form -->
+      <el-card v-if="scannedPart" class="details-card">
+        <el-row :gutter="20">
+          <!-- Part Info Display -->
+          <el-col :span="12">
+            <h3>{{ $t('stock_movement.part_details') }}</h3>
+            <p><strong>{{ $t('stock_movement.part_name') }}:</strong> {{ scannedPart.part_name }}</p>
+            <p><strong>{{ $t('stock_movement.part_number') }}:</strong> {{ scannedPart.part_number }}</p>
+            <p><strong>{{ $t('stock_movement.current_stock') }}:</strong> {{ scannedPart.stock }}</p>
+          </el-col>
+          <!-- Transaction Form -->
+          <el-col :span="12">
+            <el-form ref="transactionFormRef" :model="transactionForm" :rules="transactionRules" label-position="top">
+              <el-form-item :label="$t('stock_movement.transaction_type')" prop="trans_type">
+                <el-radio-group v-model="transactionForm.trans_type">
+                  <el-radio-button label="IN">{{ $t('stock_movement.inbound') }}</el-radio-button>
+                  <el-radio-button label="OUT">{{ $t('stock_movement.outbound') }}</el-radio-button>
+                </el-radio-group>
+              </el-form-item>
 
-            <!-- 操作区 -->
-            <el-form-item>
-              <el-button type="primary" @click="handleSubmitInOut" :loading="isSubmitting">{{ $t('stock_movement.submit') }}</el-button>
-              <el-button @click="handleResetInOut">{{ $t('stock_movement.reset') }}</el-button>
-            </el-form-item>
-          </el-form>
-        </el-tab-pane>
+              <el-form-item :label="$t('stock_movement.quantity')" prop="quantity">
+                <el-input-number v-model="transactionForm.quantity" :min="1" style="width: 100%;" />
+              </el-form-item>
 
-        <!-- Tab 2: Anomaly Report -->
-        <el-tab-pane :label="$t('stock_movement.report_anomaly')" name="anomaly">
-          <el-form
-            ref="formAnomalyRef"
-            :model="formAnomaly"
-            :rules="rulesAnomaly"
-            label-width="180px"
-            class="form-container"
-          >
-            <!-- Part Info -->
-            <el-divider content-position="left">{{ $t('stock_movement.part_info') }}</el-divider>
-            <el-form-item :label="$t('stock_movement.part_number')" prop="part_id">
-              <el-select
-                v-model="formAnomaly.part_id"
-                :placeholder="$t('stock_movement.search_select_part')"
-                filterable
-                remote
-                :remote-method="searchParts"
-                :loading="isSearching"
-                @change="handleAnomalyPartSelect"
-                style="width: 100%"
-              >
-                <el-option
-                  v-for="part in foundParts"
-                  :key="part.id"
-                  :label="`${part.part_name} (${part.part_number})`"
-                  :value="part.id"
-                />
-              </el-select>
-            </el-form-item>
-            <el-form-item :label="$t('stock_movement.current_stock')">
-              <el-input :value="selectedAnomalyPart?.stock" disabled />
-            </el-form-item>
+              <el-form-item :label="$t('stock_movement.remarks')" prop="remarks">
+                <el-input v-model="transactionForm.remarks" type="textarea" :rows="2" />
+              </el-form-item>
 
-            <!-- Operation Info -->
-            <el-divider content-position="left">{{ $t('stock_movement.operation_info') }}</el-divider>
-            <el-form-item :label="$t('stock_movement.anomaly_quantity')" prop="quantity">
-              <el-input-number
-                v-model="formAnomaly.quantity"
-                :min="1"
-                :max="selectedAnomalyPart?.stock"
-                style="width: 100%"
-              />
-            </el-form-item>
-            <el-form-item :label="$t('stock_movement.remarks')" prop="remarks">
-              <el-input v-model="formAnomaly.remarks" type="textarea" :rows="3" />
-            </el-form-item>
-
-            <!-- Actions -->
-            <el-form-item>
-              <el-button type="primary" @click="handleAnomalySubmit" :loading="isSubmitting">{{ $t('stock_movement.submit') }}</el-button>
-              <el-button @click="handleAnomalyReset">{{ $t('stock_movement.reset') }}</el-button>
-            </el-form-item>
-          </el-form>
-        </el-tab-pane>
-      </el-tabs>
+              <el-form-item>
+                <el-button type="primary" @click="handleSubmit" :loading="isSubmitting">{{ $t('stock_movement.confirm') }}</el-button>
+                <el-button @click="resetForm">{{ $t('stock_movement.cancel') }}</el-button>
+              </el-form-item>
+            </el-form>
+          </el-col>
+        </el-row>
+      </el-card>
     </el-card>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
-import { useUserStore } from '@/stores/user'
-import { Search } from '@element-plus/icons-vue'
+import { ref, reactive, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useI18n } from 'vue-i18n'
-import { getParts, getPartByNumber } from '@/api/part.api.js'
+import { getPartBySku } from '@/api/part.api.js'
 import { createTransaction } from '@/api/transaction.api.js'
+import { useUserStore } from '@/stores/user'
+import { Search } from '@element-plus/icons-vue'
 
 const { t } = useI18n()
 const userStore = useUserStore()
-const activeTab = ref('in-out')
+
+const barcode = ref('')
+const barcodeInputRef = ref(null)
+const scannedPart = ref(null)
 const isSubmitting = ref(false)
-const isSearching = ref(false)
+const transactionFormRef = ref(null)
 
-const formInOutRef = ref(null)
-const partNumberInputRef = ref(null)
-const quantityInputRef = ref(null)
-const formInOut = reactive({
-  trans_type: 'OUT',
+const transactionForm = reactive({
   part_id: null,
+  trans_type: 'IN', // Default to IN
   quantity: 1,
   remarks: '',
-})
-const rulesInOut = computed(() => ({
-  trans_type: [{ required: true, message: t('stock_movement.action_type_required') }],
-  part_id: [{ required: true, message: t('stock_movement.part_required') }],
-  quantity: [{ required: true, message: t('stock_movement.quantity_required') }],
-}))
-
-const partNumberSearch = ref('')
-const foundPartInOut = ref(null)
-
-const formAnomalyRef = ref(null)
-const formAnomaly = reactive({
-  part_id: null,
-  quantity: 1,
-  remarks: '',
+  user_id: userStore.user?.id,
 })
 
-const rulesAnomaly = computed(() => ({
-  part_id: [{ required: true, message: t('stock_movement.part_select_required') }],
-  quantity: [{ required: true, message: t('stock_movement.anomaly_quantity_required') }],
-  remarks: [{ required: true, message: t('stock_movement.remarks_required') }],
+const transactionRules = computed(() => ({
+  trans_type: [
+    { required: true, message: t('stock_movement.type_required'), trigger: 'change' },
+  ],
+  quantity: [
+    { required: true, message: t('stock_movement.quantity_required'), trigger: 'blur' },
+    { type: 'number', min: 1, message: t('stock_movement.quantity_must_be_positive'), trigger: 'blur' },
+    {
+      validator: (rule, value, callback) => {
+        if (transactionForm.trans_type === 'OUT' && value > scannedPart.value.stock) {
+          callback(new Error(t('stock_movement.outbound_quantity_error', { stock: scannedPart.value.stock })))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur',
+    },
+  ],
 }))
 
-const foundParts = ref([])
-const selectedAnomalyPart = ref(null)
+const handleBarcodeScan = async () => {
+  if (!barcode.value) return
 
-const handlePartNumberInput = async () => {
-  if (!partNumberSearch.value) {
-    return
-  }
-  isSearching.value = true
-  foundPartInOut.value = null
-  formInOut.part_id = null
   try {
-    const response = await getPartByNumber(partNumberSearch.value)
-    foundPartInOut.value = response.data
-    formInOut.part_id = response.data.id
-    ElMessage.success(t('stock_movement.part_found', { partName: response.data.part_name }))
-    quantityInputRef.value.focus()
-  } catch {
-    ElMessage.error(t('stock_movement.part_not_found'))
-  } finally {
-    isSearching.value = false
+    const response = await getPartBySku(barcode.value)
+    scannedPart.value = response.data
+    transactionForm.part_id = response.data.id
+  } catch (error) {
+    console.error('Error fetching part by SKU:', error)
+    ElMessage.error(t('stock_movement.fetch_by_sku_fail') + ` ${barcode.value}`)
+    resetForm()
   }
 }
 
-const handleSubmitInOut = async () => {
-  if (!formInOutRef.value) return
-  await formInOutRef.value.validate(async (valid) => {
-    if (valid) {
-      if (formInOut.trans_type === 'OUT' && formInOut.quantity > foundPartInOut.value.stock) {
-        ElMessage.warning(
-          t('stock_movement.quantity_exceeds_stock'),
-        )
-        return
-      }
+const handleSubmit = async () => {
+  if (!transactionFormRef.value) return
 
+  await transactionFormRef.value.validate(async (valid) => {
+    if (valid) {
       isSubmitting.value = true
       try {
-        await createTransaction(formInOut)
-        ElMessage.success(t('stock_movement.operation_successful'))
-        handleResetInOut()
+        await createTransaction(transactionForm)
+        ElMessage.success(t('stock_movement.transaction_success'))
+        resetForm() // Reset form and hide details card
       } catch (error) {
-        const errorMsg = error.response?.data?.error || t('stock_movement.operation_failed')
-        ElMessage.error(errorMsg)
+        console.error('Transaction failed:', error)
+        ElMessage.error(t('stock_movement.transaction_fail'))
       } finally {
         isSubmitting.value = false
       }
-    } else {
-      ElMessage.error(t('stock_movement.check_form_input'))
     }
   })
 }
 
-const handleResetInOut = () => {
-  formInOutRef.value.resetFields()
-  partNumberSearch.value = ''
-  foundPartInOut.value = null
-  formInOut.remarks = ''
-  partNumberInputRef.value.focus()
-}
-
-const searchParts = async (query) => {
-  if (!query) {
-    foundParts.value = []
-    return
+const resetForm = () => {
+  barcode.value = ''
+  scannedPart.value = null
+  transactionForm.part_id = null
+  transactionForm.trans_type = 'IN'
+  transactionForm.quantity = 1
+  transactionForm.remarks = ''
+  if (transactionFormRef.value) {
+    transactionFormRef.value.resetFields()
   }
-  isSearching.value = true
-  try {
-    const response = await getParts({ search: query, pageSize: 20 })
-    foundParts.value = response.data.parts
-  } catch {
-    ElMessage.error(t('stock_movement.search_parts_failed'))
-  } finally {
-    isSearching.value = false
+  if (barcodeInputRef.value) {
+    barcodeInputRef.value.focus()
   }
 }
-
-const handleAnomalyPartSelect = (partId) => {
-  selectedAnomalyPart.value = foundParts.value.find((p) => p.id === partId)
-}
-
-const handleAnomalySubmit = async () => {
-  if (!formAnomalyRef.value) return
-  await formAnomalyRef.value.validate(async (valid) => {
-    if (valid) {
-      isSubmitting.value = true
-      try {
-        await createTransaction({
-          ...formAnomaly,
-          trans_type: 'ANOMALY',
-        })
-        ElMessage.success(t('stock_movement.operation_successful'))
-        handleAnomalyReset()
-      } catch (error) {
-        const errorMsg = error.response?.data?.error || t('stock_movement.operation_failed')
-        ElMessage.error(errorMsg)
-      } finally {
-        isSubmitting.value = false
-      }
-    } else {
-      ElMessage.error(t('stock_movement.check_form_input'))
-    }
-  })
-}
-
-const handleAnomalyReset = () => {
-  formAnomalyRef.value.resetFields()
-  formAnomaly.remarks = ''
-  foundParts.value = []
-  selectedAnomalyPart.value = null
-}
-
-onMounted(() => {
-  partNumberInputRef.value.focus()
-})
 </script>
 
 <style scoped>
 .stock-movement-view {
   padding: 20px;
 }
-.form-container {
-  max-width: 600px;
-  margin: auto;
+.scanner-container {
+  text-align: center;
+  margin-bottom: 2rem;
 }
-.left-align-label .el-form-item__label {
-  text-align: left;
+.barcode-input {
+  max-width: 500px;
+  margin-top: 1rem;
+}
+.details-card {
+  padding: 20px;
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 </style>
+

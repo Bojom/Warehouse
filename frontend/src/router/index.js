@@ -43,6 +43,12 @@ const router = createRouter({
           meta: { requiresAuth: true },
         },
         {
+          path: '/attributes',
+          name: 'attributes',
+          component: () => import('../views/AttributesView.vue'),
+          meta: { requiresAuth: true, requiresAdmin: true }
+        },
+        {
           path: 'stock-movement',
           name: 'stock-movement',
           component: () => import('../views/StockMovementView.vue'),

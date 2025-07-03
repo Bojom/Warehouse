@@ -153,12 +153,15 @@ router.get('/top-anomaly-suppliers', protect, async (req, res) => {
     const results = await Transaction.findAll({
       where: { trans_type: 'ANOMALY' },
       attributes: [
-        [sequelize.fn('SUM', sequelize.col('quantity')), 'anomalyScore'],
+        [
+          sequelize.fn('COUNT', sequelize.fn('DISTINCT', sequelize.col('part_id'))),
+          'anomalyScore',
+        ],
       ],
       include: [
         {
           model: Part,
-          attributes: ['part_name'],
+          attributes: [],
           required: true,
           include: [
             {

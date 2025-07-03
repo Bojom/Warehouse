@@ -2,6 +2,10 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/db.config.js');
 const Supplier = require('./supplier.model.js');
+const Brand = require('./brand.model.js');
+const Model = require('./model.model.js');
+const PartType = require('./partType.model.js');
+const Colour = require('./colour.model.js');
 
 const Part = sequelize.define(
   'Part',
@@ -19,9 +23,6 @@ const Part = sequelize.define(
     part_name: {
       type: DataTypes.STRING,
       allowNull: false,
-    },
-    spec: {
-      type: DataTypes.STRING,
     },
     unit: {
       type: DataTypes.STRING(50),
@@ -51,6 +52,38 @@ const Part = sequelize.define(
         key: 'id',
       },
     },
+    brand_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: Brand,
+        key: 'id',
+      },
+    },
+    model_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: Model,
+        key: 'id',
+      },
+    },
+    part_type_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: PartType,
+        key: 'id',
+      },
+    },
+    colour_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: {
+        model: Colour,
+        key: 'id',
+      },
+    },
   },
   {
     tableName: 'parts',
@@ -64,5 +97,21 @@ const Part = sequelize.define(
 Supplier.hasMany(Part, { foreignKey: 'supplier_id' });
 // one Part belongs To one Supplier
 Part.belongsTo(Supplier, { foreignKey: 'supplier_id' });
+
+// Brand <> Part
+Brand.hasMany(Part, { foreignKey: 'brand_id' });
+Part.belongsTo(Brand, { foreignKey: 'brand_id' });
+
+// Model <> Part
+Model.hasMany(Part, { foreignKey: 'model_id' });
+Part.belongsTo(Model, { foreignKey: 'model_id' });
+
+// PartType <> Part
+PartType.hasMany(Part, { foreignKey: 'part_type_id' });
+Part.belongsTo(PartType, { foreignKey: 'part_type_id' });
+
+// Colour <> Part
+Colour.hasMany(Part, { foreignKey: 'colour_id' });
+Part.belongsTo(Colour, { foreignKey: 'colour_id' });
 
 module.exports = Part;

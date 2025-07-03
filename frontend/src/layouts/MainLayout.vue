@@ -8,8 +8,8 @@
       @mouseleave="isCollapsed = true"
     >
       <div class="logo">
-        <span v-if="!isCollapsed">{{ $t('navigation.warehouse') }}</span>
-        <span v-else>{{ $t('navigation.warehouseShort') }}</span>
+        <span v-if="!isCollapsed">{{ $t('app.title') }}</span>
+        <span v-else>WH</span>
       </div>
       <el-menu
         :default-active="$route.path"
@@ -19,49 +19,55 @@
         :collapse-transition="false"
       >
         <el-menu-item index="/dashboard">
-          <el-icon><i-ep-data-analysis /></el-icon>
+          <el-icon><DataLine /></el-icon>
           <template #title>
             <span>{{ $t('navigation.dashboard') }}</span>
           </template>
         </el-menu-item>
         <el-menu-item index="/inventory">
-          <el-icon><i-ep-pie-chart /></el-icon>
+          <el-icon><PieChart /></el-icon>
           <template #title>
             <span>{{ $t('navigation.inventory') }}</span>
           </template>
         </el-menu-item>
         <el-menu-item index="/parts">
-          <el-icon><i-ep-setting /></el-icon>
+          <el-icon><Tickets /></el-icon>
           <template #title>
             <span>{{ $t('navigation.parts') }}</span>
           </template>
         </el-menu-item>
+        <el-menu-item index="/attributes" v-if="userStore.isAdmin">
+          <el-icon><ScaleToOriginal /></el-icon>
+          <template #title>
+            <span>{{ $t('navigation.attributes') }}</span>
+          </template>
+        </el-menu-item>
+        <el-menu-item index="/suppliers" v-if="userStore.isAdmin">
+          <el-icon><Van /></el-icon>
+          <template #title>
+            <span>{{ $t('navigation.suppliers') }}</span>
+          </template>
+        </el-menu-item>
         <el-menu-item index="/stock-movement">
-          <el-icon><i-ep-sort /></el-icon>
+          <el-icon><Sort /></el-icon>
           <template #title>
             <span>{{ $t('navigation.stock_movement') }}</span>
           </template>
         </el-menu-item>
         <el-menu-item index="/records">
-          <el-icon><i-ep-document /></el-icon>
+          <el-icon><Memo /></el-icon>
           <template #title>
             <span>{{ $t('navigation.records') }}</span>
           </template>
         </el-menu-item>
-        <el-menu-item index="/suppliers" v-if="userStore.isAdmin">
-          <el-icon><i-ep-van /></el-icon>
-          <template #title>
-            <span>{{ $t('navigation.suppliers') }}</span>
-          </template>
-        </el-menu-item>
         <el-menu-item index="/user-management" v-if="userStore.isAdmin">
-          <el-icon><i-ep-setting /></el-icon>
+          <el-icon><Setting /></el-icon>
           <template #title>
             <span>{{ $t('navigation.user_management') }}</span>
           </template>
         </el-menu-item>
         <el-menu-item index="/register" v-if="userStore.isAdmin">
-          <el-icon><i-ep-user /></el-icon>
+          <el-icon><User /></el-icon>
           <template #title>
             <span>{{ $t('navigation.createUser') }}</span>
           </template>
@@ -77,7 +83,7 @@
           <div class="language-switcher">
             <el-dropdown @command="changeLanguage" trigger="click">
               <el-button plain>
-                {{ $t('language') }}
+                {{ $t('navigation.language') }}
               </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
@@ -104,10 +110,21 @@
 </template>
 
 <script setup>
-import { useRouter } from 'vue-router'
+import { useRouter, RouterView } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import {
+  DataLine,
+  Setting,
+  Tickets,
+  Van,
+  Memo,
+  Sort,
+  User,
+  ScaleToOriginal,
+  PieChart
+} from '@element-plus/icons-vue'
 
 const { locale } = useI18n()
 const router = useRouter()
@@ -115,8 +132,6 @@ const userStore = useUserStore()
 const isCollapsed = ref(true)
 
 onMounted(() => {
-  // Fetch user info when the layout is mounted
-  // This ensures we have the role information
   if (!userStore.user) {
     userStore.fetchUser()
   }

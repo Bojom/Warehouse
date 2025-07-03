@@ -6,10 +6,11 @@ const sequelize = require('./config/db.config.js');
 const cors = require('cors');
 const userRoutes = require('./routes/user.routes.js');
 const partRoutes = require('./routes/parts.routes');
-const inventoryRoutes = require('./routes/inventory.routes');
-const transactionRoutes = require('./routes/transaction.routes');
-const dashboardRoutes = require('./routes/dashboard.routes');
+const inventoryRoutes = require('./routes/inventory.routes.js');
+const transactionRoutes = require('./routes/transaction.routes.js');
+const dashboardRoutes = require('./routes/dashboard.routes.js');
 const supplierRoutes = require('./routes/supplier.routes');
+const dimensionsRoutes = require('./routes/dimensions.routes.js');
 
 // 2. 初始化 Express 应用
 const app = express();
@@ -57,6 +58,7 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/transactions', transactionRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/supplier', supplierRoutes);
+app.use('/api/dimensions', dimensionsRoutes);
 
 // 6. 启动服务器并测试数据库连接
 app.listen(PORT, () => {

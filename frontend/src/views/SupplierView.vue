@@ -19,7 +19,8 @@
         data-cy="suppliers-table"
       >
         <el-table-column prop="supplier_name" :label="$t('suppliers.supplier_name')" />
-        <el-table-column prop="contact" :label="$t('suppliers.contact')" />
+        <el-table-column prop="code" :label="$t('suppliers.code')" width="120" />
+        <el-table-column prop="contact" :label="$t('suppliers.contact_info')" />
         <el-table-column :label="$t('suppliers.actions')" width="150">
           <template #default="scope">
             <div class="action-buttons">

@@ -8,10 +8,17 @@
         data-cy="supplier-form-name-input"
       ></el-input>
     </el-form-item>
-    <el-form-item :label="$t('supplier_form.contact')" prop="contact">
+    <el-form-item :label="$t('supplier_form.code')" prop="code">
+      <el-input
+        v-model="form.code"
+        :placeholder="$t('supplier_form.enter_code')"
+        data-cy="supplier-form-code-input"
+      ></el-input>
+    </el-form-item>
+    <el-form-item :label="$t('supplier_form.contact_info')" prop="contact">
       <el-input
         v-model="form.contact"
-        :placeholder="$t('supplier_form.enter_contact')"
+        :placeholder="$t('supplier_form.enter_contact_info')"
         data-cy="supplier-form-contact-input"
       ></el-input>
     </el-form-item>
@@ -29,7 +36,8 @@ const props = defineProps({
     type: Object,
     default: () => ({
       supplier_name: '',
-      contact: '', // Simplified to one field
+      contact: '',
+      code: '',
     }),
   },
 })
@@ -39,6 +47,7 @@ const form = ref({ ...props.initialData })
 
 const rules = computed(() => ({
   supplier_name: [{ required: true, message: t('supplier_form.supplier_name_required'), trigger: 'blur' }],
+  code: [{ required: true, message: t('supplier_form.code_required'), trigger: 'blur' }],
 }))
 
 watch(

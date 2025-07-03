@@ -3,7 +3,7 @@
     <el-card class="login-card">
       <template #header>
         <div class="card-header">
-          <span>{{ $t('login.systemTitle') }}</span>
+          <span>{{ $t('app.title') }}</span>
         </div>
       </template>
 
@@ -42,7 +42,7 @@
             style="width: 100%"
             @click="handleLogin"
             data-cy="login-submit-button"
-            >{{ $t('login.loginButton') }}</el-button
+            >{{ $t('login.login_button') }}</el-button
           >
         </el-form-item>
       </el-form>

@@ -46,3 +46,12 @@ export const deletePart = (id) => {
 export const getPartByNumber = (partNumber) => {
   return api.get(`/parts/by-number/${partNumber}`)
 }
+
+/**
+ * Get part details by SKU
+ * @param {string} sku
+ * @returns {Promise}
+ */
+export const getPartBySku = (sku) => {
+  return api.get(`/parts/by-sku/${sku}`);
+};

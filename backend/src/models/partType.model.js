@@ -1,34 +1,29 @@
-// backend/src/models/supplier.model.js
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/db.config.js');
 
-const Supplier = sequelize.define(
-  'Supplier',
+const PartType = sequelize.define(
+  'PartType',
   {
     id: {
       type: DataTypes.INTEGER,
       primaryKey: true,
       autoIncrement: true,
     },
-    supplier_name: {
+    name: {
       type: DataTypes.STRING,
       allowNull: false,
       unique: true,
     },
-    contact: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
     code: {
       type: DataTypes.STRING(10),
-      allowNull: true, // can be null for existing suppliers
+      allowNull: false,
       unique: true,
     },
   },
   {
-    tableName: 'suppliers',
+    tableName: 'part_types',
     timestamps: false,
   }
 );
 
-module.exports = Supplier;
+module.exports = PartType; 

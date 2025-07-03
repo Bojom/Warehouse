@@ -6,6 +6,10 @@ const router = express.Router();
 const { Op } = require('sequelize');
 const Part = require('../models/part.model');
 const Supplier = require('../models/supplier.model');
+const Brand = require('../models/brand.model.js');
+const Model = require('../models/model.model.js');
+const PartType = require('../models/partType.model.js');
+const Colour = require('../models/colour.model.js');
 const { protect } = require('../middleware/auth.middleware');
 const { isAdmin } = require('../middleware/isAdmin.middleware');
 const Transaction = require('../models/transaction.model');
@@ -18,7 +22,50 @@ router.use(protect);
 // POST /api/parts
 router.post('/', isAdmin, async (req, res) => {
   try {
-    const newPart = await Part.create(req.body);
+    const {
+      brand_id,
+      model_id,
+      part_type_id,
+      colour_id,
+      supplier_id,
+      part_name, // keep other fields
+      unit,
+      stock,
+      stock_min,
+      stock_max,
+    } = req.body;
+
+    // 1. Fetch the codes from related tables
+    const brand = await Brand.findByPk(brand_id);
+    const model = await Model.findByPk(model_id);
+    const partType = await PartType.findByPk(part_type_id);
+    const colour = colour_id ? await Colour.findByPk(colour_id) : null;
+    const supplier = await Supplier.findByPk(supplier_id);
+
+    // 2. Check if all required entities were found
+    if (!brand || !model || !partType || !supplier) {
+      return res.status(400).json({ message: 'Invalid IDs provided for SKU generation.' });
+    }
+
+    // 3. Generate the SKU
+    const colourCode = colour ? colour.code : 'NA';
+    const sku = `${brand.code}${model.code}-${partType.code}-${colourCode}-${supplier.code}`;
+
+    // 4. Create the new part with the generated SKU
+    const newPart = await Part.create({
+      part_number: sku,
+      part_name,
+      brand_id,
+      model_id,
+      part_type_id,
+      colour_id,
+      supplier_id,
+      unit,
+      stock,
+      stock_min,
+      stock_max,
+    });
+
     res.status(201).json(newPart);
   } catch (error) {
     if (error.name === 'SequelizeUniqueConstraintError') {
@@ -99,6 +146,31 @@ router.get('/by-number/:partNumber', async (req, res) => {
     res
       .status(500)
       .json({ message: 'Error fetching part by number', error: error.message });
+  }
+});
+
+// GET /api/parts/by-sku/:sku
+router.get('/by-sku/:sku', async (req, res) => {
+  try {
+    const part = await Part.findOne({
+      where: { part_number: req.params.sku },
+      include: [
+        { model: Supplier, attributes: ['id', 'supplier_name'] },
+        { model: Brand, attributes: ['id', 'name'] },
+        { model: Model, attributes: ['id', 'name'] },
+        { model: PartType, attributes: ['id', 'name'] },
+        { model: Colour, attributes: ['id', 'name'] },
+      ],
+    });
+    if (part) {
+      res.json(part);
+    } else {
+      res.status(404).json({ message: 'Part not found' });
+    }
+  } catch (error) {
+    res
+      .status(500)
+      .json({ message: 'Error fetching part by SKU', error: error.message });
   }
 });
 
