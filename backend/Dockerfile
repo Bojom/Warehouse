@@ -34,4 +34,5 @@ EXPOSE 3001
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD wget -q --spider http://localhost:3001 || exit 1
 # 定义容器启动时要执行的命令
-CMD ["node", "src/app.js"]
+# We run sync, seed and then start the app.
+CMD ["sh", "-c", "node src/scripts/syncDb.js && node src/scripts/seedAttributes.js && node src/app.js"]
