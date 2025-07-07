@@ -63,10 +63,10 @@
         <el-table-column prop="part_number" :label="$t('parts.part_number')" width="180" />
         <el-table-column prop="part_name" :label="$t('parts.part_name')" width="180" />
         <el-table-column prop="stock" :label="$t('parts.stock')" width="120" />
-        <el-table-column prop="stock_min" :label="$t('parts.min_stock')" width="150" />
-        <el-table-column prop="stock_max" :label="$t('parts.max_stock')" width="150" />
-        <el-table-column prop="Supplier.supplier_name" :label="$t('parts.supplier')" width="180" />
-        <el-table-column :label="$t('parts.actions')" width="150">
+        <el-table-column prop="stock_min" :label="$t('parts.min_stock')" width="120" />
+        <el-table-column prop="stock_max" :label="$t('parts.max_stock')" width="120" />
+        <el-table-column prop="Supplier.supplier_name" :label="$t('parts.supplier')" width="150" />
+        <el-table-column :label="$t('parts.actions')" width="120">
           <template #default="scope">
             <div class="action-buttons" v-if="userStore.isAdmin">
               <el-button
@@ -88,7 +88,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column :label="$t('parts.barcode_title')" width="150">
+        <el-table-column :label="$t('parts.barcode_title')" width="200">
           <template #default="scope">
             <el-button size="small" @click="handleShowBarcode(scope.row)">
               {{ $t('parts.show_barcode') }}
@@ -241,16 +241,23 @@ const handleShowBarcode = (part) => {
   detailsDialogVisible.value = true
 }
 
-watch(detailsPart, (newVal) => {
-  if (newVal && barcodeSvgRef.value) {
+watch(detailsDialogVisible, (isVisible) => {
+  if (isVisible && detailsPart.value) {
     nextTick(() => {
-      JsBarcode(barcodeSvgRef.value, newVal.part_number, {
-        format: 'CODE128',
-        lineColor: '#000',
-        width: 1.5,
-        height: 40,
-        displayValue: false,
-      })
+      if (barcodeSvgRef.value) {
+        try {
+          JsBarcode(barcodeSvgRef.value, detailsPart.value.part_number, {
+            format: 'CODE128',
+            lineColor: '#000',
+            width: 1.5,
+            height: 40,
+            displayValue: false,
+          })
+        } catch (e) {
+          console.error('Barcode generation error:', e)
+          ElMessage.error(t('parts.barcode_fail'))
+        }
+      }
     })
   }
 })
@@ -340,10 +347,12 @@ const handleSubmit = async () => {
       fetchParts()
     } else {
       // new mode
-      await createPart(formData)
+      const response = await createPart(formData)
       ElMessage.success(t('parts.add_success'))
       handleCloseDialog()
       fetchParts()
+      detailsPart.value = response.data
+      detailsDialogVisible.value = true
     }
   } catch (error) {
     if (typeof error === 'string') {

@@ -8,10 +8,12 @@ export const useUserStore = defineStore('user', () => {
   // --- State ---
   const user = ref(null)
   const token = ref(localStorage.getItem('token'))
+  let fetchUserPromise = null;
 
   // --- Getters ---
   const isAuthenticated = computed(() => !!token.value && !!user.value)
   const isAdmin = computed(() => user.value?.role === 'admin')
+  const userName = computed(() => user.value?.user_name ?? 'N/A')
 
   // --- Actions ---
   function setToken(newToken) {
@@ -34,20 +36,32 @@ export const useUserStore = defineStore('user', () => {
   }
 
   async function fetchUser() {
-    if (token.value && !user.value) {
+    if (!token.value) {
+      return Promise.resolve();
+    }
+    // if a fetch is already in progress, return the existing promise
+    if (fetchUserPromise) {
+      return fetchUserPromise;
+    }
+
+    // start a new fetch
+    fetchUserPromise = (async () => {
       try {
-        const response = await api.get('/users/profile')
+        const response = await api.get('/users/profile');
         if (response.data && response.data.userProfile) {
-          setUser(response.data.userProfile)
+          setUser(response.data.userProfile);
         } else {
-          // If the profile can't be fetched, the token is likely invalid.
-          logout()
+          logout();
         }
       } catch (error) {
-        console.error('Failed to fetch user:', error)
-        logout() // Logout on error
+        console.error('Failed to fetch user:', error);
+        logout();
+      } finally {
+        // after the fetch is complete, reset the promise
+        fetchUserPromise = null;
       }
-    }
+    })();
+    return fetchUserPromise;
   }
 
   function logout() {
@@ -55,5 +69,5 @@ export const useUserStore = defineStore('user', () => {
     setToken(null)
   }
 
-  return { user, token, isAuthenticated, isAdmin, setUser, setToken, fetchUser, logout }
+  return { user, token, isAuthenticated, isAdmin, userName, setUser, setToken, fetchUser, logout }
 })

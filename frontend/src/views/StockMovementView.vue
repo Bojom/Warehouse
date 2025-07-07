@@ -30,6 +30,9 @@
           <!-- Transaction Form -->
           <el-col :span="12">
             <el-form ref="transactionFormRef" :model="transactionForm" :rules="transactionRules" label-position="top">
+              <el-form-item :label="$t('stock_movement.operator_label')">
+                <el-input :value="userStore.userName" disabled />
+              </el-form-item>
               <el-form-item :label="$t('stock_movement.transaction_type')" prop="trans_type">
                 <el-radio-group v-model="transactionForm.trans_type">
                   <el-radio-button label="IN">{{ $t('stock_movement.inbound') }}</el-radio-button>

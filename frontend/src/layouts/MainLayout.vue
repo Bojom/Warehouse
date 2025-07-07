@@ -36,7 +36,7 @@
             <span>{{ $t('navigation.parts') }}</span>
           </template>
         </el-menu-item>
-        <el-menu-item index="/attributes" v-if="userStore.isAdmin">
+        <el-menu-item index="/attributes">
           <el-icon><ScaleToOriginal /></el-icon>
           <template #title>
             <span>{{ $t('navigation.attributes') }}</span>
@@ -95,7 +95,7 @@
             </el-dropdown>
           </div>
           <div class="user-info">
-            <span>{{ $t('navigation.welcome') }}, {{ userStore.user?.user_name || 'User' }}</span>
+            <span>{{ $t('navigation.welcome') }}, {{ userStore.userName }}</span>
             <el-button type="danger" plain @click="handleLogout">{{ $t('navigation.logout') }}</el-button>
           </div>
         </div>
@@ -131,10 +131,10 @@ const router = useRouter()
 const userStore = useUserStore()
 const isCollapsed = ref(true)
 
-onMounted(() => {
-  if (!userStore.user) {
-    userStore.fetchUser()
-  }
+onMounted(async () => {
+  // fetchUser now returns a promise that resolves when the user is fetched.
+  // We await it to ensure the user data is available before proceeding.
+  await userStore.fetchUser()
 })
 
 const handleLogout = () => {

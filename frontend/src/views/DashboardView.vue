@@ -24,17 +24,17 @@
             </el-card>
           </el-col>
           <el-col :span="6">
-            <el-card shadow="hover">
+            <el-card shadow="hover" class="clickable" @click="showTodaysTransactions('IN')">
               <div class="card-content">
-                <div class="label">{{ $t('dashboard.today_in_count') }}</div>
+                <div class="label">{{ $t('dashboard.today_inbound') }}</div>
                 <div class="value">{{ dashboardData?.todayInCount ?? 'N/A' }}</div>
               </div>
             </el-card>
           </el-col>
           <el-col :span="6">
-            <el-card shadow="hover">
+            <el-card shadow="hover" class="clickable" @click="showTodaysTransactions('OUT')">
               <div class="card-content">
-                <div class="label">{{ $t('dashboard.today_out_count') }}</div>
+                <div class="label">{{ $t('dashboard.today_outbound') }}</div>
                 <div class="value">{{ dashboardData?.todayOutCount ?? 'N/A' }}</div>
               </div>
             </el-card>
@@ -42,7 +42,7 @@
           <el-col :span="6">
             <el-card shadow="hover" body-style="background-color: #fef0f0;">
               <div class="card-content">
-                <div class="label" style="color: #f56c6c">{{ $t('dashboard.low_stock_warning_count') }}</div>
+                <div class="label" style="color: #f56c6c">{{ $t('dashboard.low_stock_warnings') }}</div>
                 <div class="value" style="color: #f56c6c">
                   {{ dashboardData?.lowStockItems?.length ?? 'N/A' }}
                 </div>
@@ -90,7 +90,7 @@
     <el-card class="warning-section">
       <template #header>
         <div class="card-header">
-          <span>{{ $t('dashboard.low_stock_warning') }}</span>
+          <span>{{ $t('dashboard.low_stock_warnings') }}</span>
           <router-link to="/inventory">
             <el-button text>{{ $t('dashboard.view_all') }}</el-button>
           </router-link>
@@ -106,6 +106,23 @@
         {{ $t('dashboard.no_low_stock') }}
       </div>
     </el-card>
+
+    <!-- Details Dialog -->
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="70%">
+      <el-table :data="dialogTransactions" v-loading="dialogLoading" border>
+        <el-table-column prop="trans_time" :label="$t('records.operation_time')" width="180">
+           <template #default="scope">{{ new Date(scope.row.trans_time).toLocaleString() }}</template>
+        </el-table-column>
+        <el-table-column prop="part_number" :label="$t('parts.part_number')" />
+        <el-table-column prop="part_name" :label="$t('parts.part_name')" />
+        <el-table-column prop="quantity" :label="$t('records.quantity')" />
+        <el-table-column prop="operator" :label="$t('records.operator')" />
+        <el-table-column prop="remarks" :label="$t('records.remarks')" />
+      </el-table>
+      <template #footer>
+        <el-button @click="dialogVisible = false">{{ $t('attributes.close') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -136,7 +153,7 @@ const statusChartOption = computed(() => ({
   grid: { left: 0, right: 0, top: 10, bottom: 0, containLabel: true },
   xAxis: {
     type: 'category',
-    data: [t('dashboard.low_stock'), t('dashboard.normal_stock'), t('dashboard.over_stock')],
+    data: [t('dashboard.out_of_stock'), t('dashboard.low_stock'), t('dashboard.normal_stock')],
     axisLabel: { interval: 0 }, // ensure all labels are displayed
   },
   yAxis: { type: 'value', show: false }, // hide y-axis
@@ -148,7 +165,7 @@ const statusChartOption = computed(() => ({
       // set different colors for different bars
       itemStyle: {
         color: (params) => {
-          const colorList = ['#F56C6C', '#67C23A', '#E6A23C']
+          const colorList = ['#F56C6C', '#E6A23C', '#67C23A']
           return colorList[params.dataIndex]
         },
       },
@@ -192,8 +209,8 @@ const fetchStockStatusData = async () => {
   statusChartLoading.value = true
   try {
     const response = await api.get('/dashboard/stock-status')
-    const { lowStock, normalStock, overStock } = response.data
-    statusChartData.value = [lowStock, normalStock, overStock]
+    const { outOfStock, lowStock, normalStock } = response.data
+    statusChartData.value = [outOfStock, lowStock, normalStock]
   } catch (error) {
     console.error('Failed to fetch stock status data:', error)
   } finally {
@@ -207,7 +224,7 @@ const fetchAnomalyData = async () => {
     const response = await api.get('/dashboard/top-anomaly-suppliers')
     const { supplierNames, anomalyScores } = response.data
     const newOptions = createAnomalyChartOption(supplierNames, anomalyScores)
-    anomalyChartOption.xAxis.data = newOptions.xAxis.data
+    anomalyChartOption.yAxis.data = newOptions.yAxis.data
     anomalyChartOption.series[0].data = newOptions.series[0].data
   } catch (error) {
     console.error('Failed to fetch anomaly data:', error)
@@ -252,6 +269,38 @@ const handleExportPDF = async () => {
     isExporting.value = false
   }
 }
+
+// --- Dialog State ---
+const dialogVisible = ref(false);
+const dialogTitle = ref('');
+const dialogTransactions = ref([]);
+const dialogLoading = ref(false);
+
+const showTodaysTransactions = async (type) => {
+  dialogTitle.value = type === 'IN' ? t('dashboard.todays_inbound_details') : t('dashboard.todays_outbound_details');
+  dialogLoading.value = true;
+  dialogVisible.value = true;
+
+  const today = new Date();
+  const startDate = new Date(today.setHours(0, 0, 0, 0)).toISOString();
+  const endDate = new Date(today.setHours(23, 59, 59, 999)).toISOString();
+
+  try {
+    const response = await api.get('/transactions', {
+      params: {
+        type: type,
+        startDate: startDate,
+        endDate: endDate,
+        pageSize: 1000, // Fetch all for today
+      },
+    });
+    dialogTransactions.value = response.data.data;
+  } catch (error) {
+    console.error('Failed to fetch transactions:', error);
+  } finally {
+    dialogLoading.value = false;
+  }
+};
 
 onMounted(async () => {
   loading.value = true
@@ -300,5 +349,11 @@ onMounted(async () => {
 }
 .page-header-card {
   margin-bottom: 20px;
+}
+.clickable {
+  cursor: pointer;
+}
+.clickable:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 </style>

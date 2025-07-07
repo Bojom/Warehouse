@@ -16,11 +16,12 @@ router.post('/', protect, async (req, res) => {
 
   try {
     const result = await sequelize.transaction(async (t) => {
+      if (trans_type === 'IN' || trans_type === 'OUT') {
+        // --- Handle IN/OUT: Lock and update part stock ---
       const part = await Part.findByPk(part_id, {
         lock: t.LOCK.UPDATE,
         transaction: t,
       });
-
       if (!part) {
         throw new Error('配件不存在');
       }
@@ -32,26 +33,26 @@ router.post('/', protect, async (req, res) => {
           );
         }
         part.stock += quantity;
-      } else if (trans_type === 'OUT' || trans_type === 'ANOMALY') {
+        } else { // trans_type === 'OUT'
         if (part.stock < quantity) {
-          const message =
-            trans_type === 'OUT'
-              ? '库存不足，无法出库'
-              : '库存不足，无法报为异常';
-          throw new Error(message);
+            throw new Error('库存不足，无法出库');
         }
         part.stock -= quantity;
-      } else {
+        }
+        await part.save({ transaction: t });
+
+      } else if (trans_type !== 'ANOMALY') {
+        // --- Handle invalid type ---
         throw new Error('无效的操作类型');
       }
+      // --- For ANOMALY type, we do nothing to the stock, just log the transaction ---
 
-      await part.update({ stock: part.stock }, { transaction: t });
-
+      // --- Create the transaction record for all types ---
       const newTransaction = await Transaction.create(
         {
           part_id,
           user_id,
-          trans_type: trans_type,
+          trans_type,
           quantity,
           remarks,
         },
@@ -81,63 +82,79 @@ router.get('/', protect, async (req, res) => {
       page = 1,
       pageSize = 10,
       partId,
-      userId,
       type,
       startDate,
       endDate,
-    } = req.query;
-    const trans_type = type;
+      brandId,
+      modelId,
+      partTypeId,
+    } = req.query
 
-    const whereCondition = {};
-    if (partId) whereCondition.part_id = partId;
-    if (userId) whereCondition.user_id = userId;
-    if (trans_type) whereCondition.trans_type = trans_type;
+    const offset = (page - 1) * pageSize
+    let where = {}
+    let partWhere = {} // Where clause for the Part model
+
+    if (type) {
+      where.trans_type = type;
+    }
+    if (partId && partId.length > 0) {
+      const partIds = Array.isArray(partId) ? partId : partId.split(',');
+      if (partIds.length > 0) {
+        where.part_id = { [Op.in]: partIds };
+      }
+    }
     if (startDate && endDate) {
-      whereCondition.trans_time = {
-        [Op.between]: [new Date(startDate), new Date(endDate)],
-      };
-    } else if (startDate) {
-      whereCondition.trans_time = { [Op.gte]: new Date(startDate) };
-    } else if (endDate) {
-      whereCondition.trans_time = { [Op.lte]: new Date(endDate) };
+      where.trans_time = { [Op.between]: [new Date(startDate), new Date(endDate)] }
     }
 
-    const limit = parseInt(pageSize, 10);
-    const offset = (parseInt(page, 10) - 1) * limit;
+    // New filtering logic for part attributes
+    if (brandId) partWhere.brand_id = brandId
+    if (modelId) partWhere.model_id = modelId
+    if (partTypeId) partWhere.part_type_id = partTypeId
 
     const { count, rows } = await Transaction.findAndCountAll({
-      where: whereCondition,
+      where,
       include: [
         {
           model: Part,
-          attributes: ['part_number', 'part_name', 'spec'],
+          as: 'Part',
+          attributes: ['part_name', 'part_number'],
+          where: partWhere, // Apply part filters here
+          required: Object.keys(partWhere).length > 0 || partId, // Make join required if filtering by part attributes
         },
         {
           model: User,
-          attributes: [['user_name', 'username']],
+          attributes: [['user_name', 'operator']],
+          required: false, // Use LEFT JOIN
         },
       ],
-      limit,
-      offset,
       order: [['trans_time', 'DESC']],
+      limit: parseInt(pageSize, 10),
+      offset: offset,
+      raw: true, // Use raw: true to get plain objects
+      nest: true, // Use nest: true to nest included models
     });
 
-    const formattedRows = rows.map((row) => {
-      const plainRow = row.get({ plain: true });
-      return {
-        ...plainRow,
-        type: plainRow.trans_type,
-        transaction_time: plainRow.trans_time,
-      };
-    });
+    // With raw: true and nest: true, the data is already in a clean format.
+    // We just need to ensure the top-level properties are consistent.
+    const formattedTransactions = rows.map(t => ({
+      id: t.id,
+      trans_type: t.trans_type,
+      quantity: t.quantity,
+      part_id: t.part_id,
+      part_number: t.Part?.part_number ?? 'N/A',
+      part_name: t.Part?.part_name ?? 'N/A',
+      operator: t.User?.operator ?? 'N/A', // Access the aliased 'operator' field
+      trans_time: t.trans_time,
+      remarks: t.remarks,
+    }));
 
     res.json({
-      totalItems: count,
-      totalPages: Math.ceil(count / limit),
-      currentPage: parseInt(page, 10),
-      transactions: formattedRows,
+      total: count,
+      data: formattedTransactions,
     });
   } catch (error) {
+    console.error('Failed to get transactions:', error);
     res.status(500).json({ message: '获取记录失败', error: error.message });
   }
 });
@@ -145,7 +162,24 @@ router.get('/', protect, async (req, res) => {
 // GET /api/transactions/summary
 router.get('/summary', protect, async (req, res) => {
   try {
+    const { partId, type, startDate, endDate } = req.query;
+    const trans_type = type;
+
+    const whereCondition = {};
+    if (partId && partId.length > 0) {
+      whereCondition.part_id = { [Op.in]: partId.split(',') };
+    }
+    if (trans_type && trans_type.length > 0) {
+      whereCondition.trans_type = trans_type;
+    }
+    if (startDate && endDate) {
+      whereCondition.trans_time = {
+        [Op.between]: [new Date(startDate), new Date(endDate)],
+      };
+    }
+
     const summary = await Transaction.findAll({
+      where: whereCondition,
       attributes: [
         [
           sequelize.fn('DATE_TRUNC', 'day', sequelize.col('trans_time')),
@@ -167,8 +201,20 @@ router.get('/summary', protect, async (req, res) => {
 // GET /api/transactions/export
 router.get('/export', protect, async (req, res) => {
   try {
-    const { partId, userId, type, startDate, endDate, locale = 'zh' } = req.query;
-    console.log('Received locale parameter:', locale); // Debug log
+    const { partId, userId, type, startDate, endDate } = req.query;
+    
+    // Determine language from 'Accept-Language' header, default to 'en'
+    const langHeader = req.headers['accept-language'] || 'en';
+    console.log('Received Accept-Language Header:', langHeader); // <-- ADDING THIS LOG
+    const firstLang = langHeader.split(',')[0].trim().toLowerCase();
+    
+    let locale = 'en'; // Default to English
+    if (firstLang.startsWith('zh')) {
+      locale = 'zh';
+    } else if (firstLang.startsWith('fr')) {
+      locale = 'fr';
+    }
+
     const trans_type = type;
 
     // Translation mappings
@@ -232,15 +278,17 @@ router.get('/export', protect, async (req, res) => {
       }
     };
 
-    const t = translations[locale] || translations.zh;
+    const t = translations[locale] || translations.en;
 
     const whereCondition = {};
-    if (partId) {
+    if (partId && partId.length > 0) {
       const partIds = partId.split(',');
       whereCondition.part_id = { [Op.in]: partIds };
     }
     if (userId) whereCondition.user_id = userId;
-    if (trans_type) whereCondition.trans_type = trans_type;
+    if (trans_type && trans_type.length > 0) {
+      whereCondition.trans_type = trans_type;
+    }
     if (startDate && endDate) {
       whereCondition.trans_time = {
         [Op.between]: [new Date(startDate), new Date(endDate)],
@@ -296,6 +344,18 @@ router.get('/export', protect, async (req, res) => {
       { header: t.headers.user, key: 'user', width: 15 },
       { header: t.headers.remarks, key: 'remarks', width: 40 },
     ];
+
+    // Style the header row
+    worksheet.getRow(1).eachCell((cell) => {
+      cell.font = { bold: true };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFD3D3D3' } // A light grey color
+      };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    });
+
 
     transactions.forEach((t_instance) => {
       const t = t_instance.get({ plain: true });

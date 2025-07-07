@@ -13,37 +13,49 @@
             value-format="YYYY-MM-DD HH:mm:ss"
           />
         </el-form-item>
-        <el-form-item :label="$t('records.part')">
+        <!-- New Brand/Model/PartType Filters -->
+        <el-form-item :label="$t('attributes.brands')">
           <el-select
-            v-model="queryParams.partIds"
-            :placeholder="$t('records.select_part')"
+            v-model="queryParams.brandId"
+            :placeholder="$t('attributes.select_brand')"
             clearable
             filterable
-            multiple
-            collapse-tags
+            @change="handleBrandChange"
           >
-            <el-option
-              v-for="part in partsForSelect"
-              :key="part.id"
-              :label="`${part.part_name} (${part.part_number})`"
-              :value="part.id"
-            />
+            <el-option v-for="brand in brands" :key="brand.id" :label="brand.name" :value="brand.id" />
           </el-select>
         </el-form-item>
-        <el-form-item :label="$t('records.operation_type')">
+        <el-form-item :label="$t('attributes.models')">
           <el-select
-            v-model="queryParams.type"
-            :placeholder="$t('records.select_type')"
+            v-model="queryParams.modelId"
+            :placeholder="$t('attributes.select_model')"
             clearable
+            filterable
+            :disabled="!queryParams.brandId"
           >
-            <el-option :label="$t('records.in')" value="IN" />
-            <el-option :label="$t('records.out')" value="OUT" />
+            <el-option v-for="model in filteredModels" :key="model.id" :label="model.name" :value="model.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="$t('attributes.part_types')">
+          <el-select
+            v-model="queryParams.partTypeId"
+            :placeholder="$t('attributes.select_part_type')"
+            clearable
+            filterable
+          >
+            <el-option v-for="pt in partTypes" :key="pt.id" :label="pt.name" :value="pt.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item :label="$t('records.trans_type')">
+          <el-select v-model="queryParams.type" :placeholder="$t('records.select_type')" clearable>
+            <el-option :label="$t('stock_movement.inbound')" value="IN" />
+            <el-option :label="$t('stock_movement.outbound')" value="OUT" />
             <el-option :label="$t('records.anomaly')" value="ANOMALY" />
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="handleSearch">{{ $t('records.search') }}</el-button>
-          <el-button @click="resetQuery">{{ $t('records.reset') }}</el-button>
+          <el-button type="primary" @click="handleSearch">{{ $t('parts.search') }}</el-button>
+          <el-button @click="resetQuery">{{ $t('parts.reset') }}</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -67,21 +79,32 @@
       <el-table v-loading="loading" :data="recordsList" border>
         <el-table-column :label="$t('records.operation_time')" width="180">
           <template #default="scope">
-            {{ formatDateTime(scope.row.transaction_time) }}
+            {{ formatDateTime(scope.row.trans_time) }}
           </template>
         </el-table-column>
-        <el-table-column prop="Part.part_number" :label="$t('records.part_number')" width="200" />
-        <el-table-column prop="Part.part_name" :label="$t('records.part_name')" />
-        <el-table-column :label="$t('records.type')" width="100" align="center">
+        <el-table-column prop="part_number" :label="$t('parts.part_number')" width="200" />
+        <el-table-column prop="part_name" :label="$t('parts.part_name')" />
+        <el-table-column :label="$t('records.trans_type')" width="100" align="center">
           <template #default="scope">
-            <el-tag :type="getTagType(scope.row.type)">
-              {{ getTypeText(scope.row.type) }}
+            <el-tag :type="getTagType(scope.row.trans_type)">
+              {{ getTypeText(scope.row.trans_type) }}
             </el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="quantity" :label="$t('records.quantity')" align="center" width="100" />
-        <el-table-column prop="User.username" :label="$t('records.operator')" width="120" />
+        <el-table-column prop="operator" :label="$t('records.operator')" width="120" />
         <el-table-column prop="remarks" :label="$t('records.remarks')" />
+        <el-table-column :label="$t('records.actions')" align="center" width="150">
+          <template #default="scope">
+            <el-button
+              v-if="scope.row.trans_type === 'OUT'"
+              type="danger"
+              size="small"
+              @click="openAnomalyDialog(scope.row)"
+              >{{ $t('records.report_anomaly') }}</el-button
+            >
+          </template>
+        </el-table-column>
       </el-table>
 
       <el-pagination
@@ -94,16 +117,38 @@
         @current-change="handlePageChange"
       />
     </el-card>
+
+    <!-- anomaly dialog -->
+    <el-dialog v-model="anomalyDialogVisible" :title="$t('records.report_anomaly_title')">
+      <el-form :model="anomalyForm" label-position="top">
+        <el-form-item :label="$t('records.part_name')">
+          <el-input :value="selectedTransaction.part_name" disabled />
+        </el-form-item>
+        <el-form-item :label="$t('records.outbound_quantity')">
+          <el-input :value="selectedTransaction.quantity" disabled />
+        </el-form-item>
+        <el-form-item :label="$t('records.anomaly_quantity')" required>
+          <el-input-number v-model="anomalyForm.quantity" :min="1" :max="selectedTransaction.quantity" />
+        </el-form-item>
+        <el-form-item :label="$t('records.remarks')">
+          <el-input v-model="anomalyForm.remarks" type="textarea" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="anomalyDialogVisible = false">{{ $t('parts.cancel') }}</el-button>
+        <el-button type="primary" @click="handleReportAnomaly">{{ $t('parts.confirm') }}</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import api from '@/utils/api'
 import { useI18n } from 'vue-i18n'
-import { getParts } from '@/api/part.api' // 引入配件API
-import { exportTransactions } from '@/api/transaction.api' // 引入导出API
+import { exportTransactions, createTransaction } from '@/api/transaction.api' // 引入导出API
+import { getBrands, getModels, getPartTypes } from '@/api/dimensions.api'
 import BaseChart from '@/components/charts/BaseChart.vue'
 
 const { t, locale } = useI18n()
@@ -147,8 +192,8 @@ const getTagType = (type) => {
 }
 
 const getTypeText = (type) => {
-  if (type === 'IN') return t('records.in')
-  if (type === 'OUT') return t('records.out')
+  if (type === 'IN') return t('stock_movement.inbound')
+  if (type === 'OUT') return t('stock_movement.outbound')
   if (type === 'ANOMALY') return t('records.anomaly')
   return t('records.unknown')
 }
@@ -157,21 +202,98 @@ const getTypeText = (type) => {
 const recordsList = ref([])
 const total = ref(0)
 const loading = ref(false)
-const partsForSelect = ref([]) // used for part dropdown selection
-const dateRange = ref([]) // used for storing the value of the date range selector
+const dateRange = ref([])
 const chartOption = ref(null)
+
+// --- dimension filters state ---
+const brands = ref([])
+const allModels = ref([])
+const filteredModels = ref([])
+const partTypes = ref([])
+
+// --- anomaly dialog state ---
+const anomalyDialogVisible = ref(false)
+const selectedTransaction = ref({})
+const anomalyForm = reactive({
+  quantity: 1,
+  remarks: '',
+})
 
 // query parameters
 const queryParams = reactive({
   page: 1,
   pageSize: 10,
-  partIds: [],
   type: '',
   startDate: '',
   endDate: '',
+  brandId: null,
+  modelId: null,
+  partTypeId: null,
 })
 
+
+const handleExport = async () => {
+  try {
+    const loadingMessage = ElMessage({
+      message: t('records.exporting'),
+      type: 'info',
+      duration: 0,
+    });
+
+    const params = {
+      ...queryParams,
+      startDate: dateRange.value?.[0],
+      endDate: dateRange.value?.[1],
+    };
+
+    const { blob, filename } = await exportTransactions(params, locale.value);
+
+    const link = document.createElement('a');
+    const url = window.URL.createObjectURL(new Blob([blob]));
+    link.href = url;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+
+    loadingMessage.close();
+  } catch (error) {
+    console.error('Failed to export records:', error)
+    ElMessage.error(t('records.export_failed'));
+  }
+};
+
+// --- watcher for cascading model dropdown ---
+watch(
+  () => queryParams.brandId,
+  (newBrandId) => {
+    queryParams.modelId = null // Reset model when brand changes
+    if (newBrandId) {
+      filteredModels.value = allModels.value.filter((model) => model.brand_id === newBrandId)
+    } else {
+      filteredModels.value = []
+    }
+  },
+)
+
 // --- data fetching ---
+const fetchDimensions = async () => {
+  try {
+    const [brandsRes, modelsRes, partTypesRes] = await Promise.all([
+      getBrands(),
+      getModels(),
+      getPartTypes(),
+    ])
+    brands.value = brandsRes.data
+    allModels.value = modelsRes.data
+    partTypes.value = partTypesRes.data
+  } catch (error) {
+    ElMessage.error(t('attributes.fetch_fail'))
+    console.error('Failed to fetch dimensions:', error)
+  }
+}
+
 const fetchRecords = async () => {
   loading.value = true
   // update queryParams from dateRange
@@ -183,18 +305,18 @@ const fetchRecords = async () => {
     queryParams.endDate = ''
   }
 
-  // prepare parameters to send, partIds needs special handling
-  const paramsToSend = { ...queryParams }
-  if (paramsToSend.partIds && paramsToSend.partIds.length > 0) {
-    // backend needs partId, value is a comma-separated string
-    paramsToSend.partId = paramsToSend.partIds.join(',')
+  // prepare parameters to send, remove null/empty values
+  const paramsToSend = Object.entries(queryParams).reduce((acc, [key, value]) => {
+    if (value !== null && value !== '') {
+      acc[key] = value
   }
-  delete paramsToSend.partIds // delete old partIds property
+    return acc
+  }, {})
 
   try {
     const response = await api.get('/transactions', { params: paramsToSend })
-    recordsList.value = response.data.transactions
-    total.value = response.data.totalItems
+    recordsList.value = response.data.data
+    total.value = response.data.total
   } catch (error) {
     console.error('Failed to fetch records:', error)
   } finally {
@@ -204,18 +326,26 @@ const fetchRecords = async () => {
 
 const fetchChartData = async () => {
   try {
-    const response = await api.get('/transactions/summary')
-    processChartData(response.data)
+    // Pass the same filters to the summary endpoint
+    const paramsToSend = { ...queryParams };
+    delete paramsToSend.partTypeId; // remove original array
+
+    if (queryParams.partTypeId) {
+      paramsToSend.partTypeId = queryParams.partTypeId;
+    }
+
+    const response = await api.get('/transactions/summary', { params: paramsToSend });
+    processChartData(response.data);
   } catch (error) {
-    console.error('Failed to fetch chart data:', error)
+    console.error('Failed to fetch chart data:', error);
   }
-}
+};
 
 const processChartData = (data) => {
   const dates = [...new Set(data.map((item) => new Date(item.date).toLocaleDateString()))]
   const series = {
-    IN: { name: t('records.in'), type: 'line', data: new Array(dates.length).fill(0) },
-    OUT: { name: t('records.out'), type: 'line', data: new Array(dates.length).fill(0) },
+    IN: { name: t('stock_movement.inbound'), type: 'line', data: new Array(dates.length).fill(0) },
+    OUT: { name: t('stock_movement.outbound'), type: 'line', data: new Array(dates.length).fill(0) },
     ANOMALY: { name: t('records.anomaly'), type: 'line', data: new Array(dates.length).fill(0) },
   }
 
@@ -236,61 +366,73 @@ const processChartData = (data) => {
   }
 }
 
-// get parts list for filtering (no pagination)
-const fetchAllPartsForSelect = async () => {
+// --- event handling ---
+const handleBrandChange = () => {
+  // The watcher already handles the logic, this function is just to trigger it
+}
+
+const openAnomalyDialog = (transaction) => {
+  selectedTransaction.value = transaction
+  anomalyForm.quantity = 1
+  anomalyForm.remarks = ''
+  anomalyDialogVisible.value = true
+}
+
+const handleReportAnomaly = async () => {
+  if (!anomalyForm.quantity || anomalyForm.quantity <= 0) {
+    ElMessage.error(t('records.error_quantity_invalid'))
+    return
+  }
+  if (anomalyForm.quantity > selectedTransaction.value.quantity) {
+    ElMessage.error(t('records.error_anomaly_quantity_exceeds'))
+    return
+  }
+
   try {
-    // assume getParts supports a large pageSize to get all
-    const response = await getParts({ pageSize: 10000 })
-    partsForSelect.value = response.data.parts
+    await createTransaction({
+      part_id: selectedTransaction.value.part_id,
+      trans_type: 'ANOMALY',
+      quantity: anomalyForm.quantity,
+      remarks: anomalyForm.remarks,
+    })
+    ElMessage.success(t('records.report_anomaly_success'))
+    anomalyDialogVisible.value = false
+    fetchRecords() // refresh data
+    fetchChartData()
   } catch (error) {
-    console.error('Failed to fetch parts for select:', error)
+    console.error('Failed to report anomaly:', error)
+    ElMessage.error(error.response?.data?.message || t('records.report_anomaly_fail'))
   }
 }
 
-// --- event handling ---
 const handleSearch = () => {
   queryParams.page = 1
   fetchRecords()
-}
-
-const handleExport = async () => {
-  try {
-    console.log('Current locale:', locale.value) // Debug log
-    const response = await exportTransactions(queryParams, locale.value)
-
-    const url = window.URL.createObjectURL(new Blob([response.data]))
-    const link = document.createElement('a')
-    link.href = url
-    // Dynamically generate file name, can be customized
-    link.setAttribute('download', `records-${new Date().toISOString().split('T')[0]}.xlsx`)
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-
-    ElMessage.success(t('records.export_started'))
-  } catch (error) {
-    console.error('Failed to export:', error)
-    ElMessage.error(t('records.export_failed'))
-  }
+  fetchChartData()
 }
 
 const resetQuery = () => {
-  queryParams.page = 1
-  queryParams.partIds = []
-  queryParams.type = ''
   dateRange.value = []
+  queryParams.page = 1
+  queryParams.type = ''
+  queryParams.startDate = ''
+  queryParams.endDate = ''
+  queryParams.brandId = null
+  queryParams.modelId = null
+  queryParams.partTypeId = null
   fetchRecords()
+  fetchChartData()
 }
 
-const handlePageChange = (newPage) => {
-  queryParams.page = newPage
+const handlePageChange = (page) => {
+  queryParams.page = page
   fetchRecords()
 }
 
 // --- lifecycle hooks ---
 onMounted(() => {
+  fetchDimensions()
   fetchRecords()
-  fetchAllPartsForSelect()
   fetchChartData()
 })
 </script>

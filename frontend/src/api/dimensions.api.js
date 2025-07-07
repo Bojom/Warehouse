@@ -23,4 +23,8 @@ export const deletePartType = (id) => api.delete(`/dimensions/part-types/${id}`)
 export const getColours = () => api.get('/dimensions/colours')
 export const createColour = (data) => api.post('/dimensions/colours', data)
 export const updateColour = (id, data) => api.put(`/dimensions/colours/${id}`, data)
-export const deleteColour = (id) => api.delete(`/dimensions/colours/${id}`)
+export const deleteColour = (id) => api.delete(`/dimensions/colours/${id}`);
+
+export const searchByCode = (code) => {
+  return api.get('/dimensions/search-by-code', { params: { code } });
+};

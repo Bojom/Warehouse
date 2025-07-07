@@ -22,17 +22,25 @@ export const createTransaction = (data) => {
  * 导出交易记录为 Excel
  * @returns {Promise}
  */
-export const exportTransactions = (params, locale = 'zh') => {
-  const requestParams = { ...params, locale }
-  if (requestParams.partIds && requestParams.partIds.length > 0) {
-    requestParams.partId = requestParams.partIds.join(',')
-  }
-  delete requestParams.partIds
-
+export const exportTransactions = (params, lang) => {
   return api.get('/transactions/export', {
-    params: requestParams,
+    params,
     responseType: 'blob', // Important for file downloads
-  })
+    headers: {
+      'Accept-Language': lang || 'en'
+    }
+  }).then(response => {
+    // To handle the file download correctly, we need to extract the filename
+    // from the 'Content-Disposition' header and return it along with the data blob.
+    const header = response.headers['content-disposition'];
+    const filenameMatch = header && header.match(/filename="(.+?)"/);
+    const filename = filenameMatch ? decodeURIComponent(filenameMatch[1]) : 'transactions.xlsx';
+
+    return {
+      blob: response.data,
+      filename: filename
+    };
+  });
 }
 
 // 新增：报告故障配件

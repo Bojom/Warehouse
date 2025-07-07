@@ -10,6 +10,10 @@ require('../models/user.model.js');
 require('../models/part.model.js');
 require('../models/supplier.model.js');
 require('../models/transaction.model.js');
+require('../models/brand.model.js');
+require('../models/colour.model.js');
+require('../models/model.model.js');
+require('../models/partType.model.js');
 
 const syncDatabase = async () => {
   try {

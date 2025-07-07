@@ -18,11 +18,14 @@ services:
       - PORT=3001
     command: >
       sh -c "
+        echo 'Waiting for database...' && sleep 5 &&
         echo 'Connecting to Cloud SQL database...' &&
         node /app/src/scripts/syncDb.js &&
         echo 'Database synced.' &&
         node /app/src/scripts/seedAdmin.js &&
         echo 'Admin user seeded.' &&
+        node /app/src/scripts/seedAttributes.js &&
+        echo 'Attributes seeded.' &&
         node /app/src/app.js
       "
     networks:

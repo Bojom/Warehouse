@@ -109,26 +109,73 @@ router.get('/trends', protect, async (req, res) => {
   }
 });
 
+// GET /api/dashboard/top-anomaly-suppliers
+router.get('/top-anomaly-suppliers', protect, async (req, res) => {
+  try {
+    const topN = req.query.limit || 10
+
+    const results = await Transaction.findAll({
+      attributes: [
+        [sequelize.col('Part.Supplier.supplier_name'), 'supplierName'],
+        [sequelize.fn('SUM', sequelize.col('quantity')), 'totalAnomalies'],
+      ],
+      where: {
+        trans_type: 'ANOMALY',
+      },
+      include: [
+        {
+          model: Part,
+          attributes: [],
+          required: true,
+          include: [
+            {
+              model: Supplier,
+              attributes: [],
+              required: true,
+            },
+          ],
+        },
+      ],
+      group: [sequelize.col('Part.Supplier.supplier_name')],
+      order: [[sequelize.fn('SUM', sequelize.col('quantity')), 'DESC']],
+      limit: topN,
+      raw: true, // Get plain JSON objects
+    })
+
+    const supplierNames = results.map((item) => item.supplierName)
+    const anomalyScores = results.map((item) => parseInt(item.totalAnomalies, 10))
+
+    res.json({ supplierNames, anomalyScores })
+  } catch (error) {
+    res.status(500).json({
+      message: 'Error fetching top anomaly suppliers',
+      error: error.message,
+    });
+  }
+});
+
 // GET /api/dashboard/stock-status
 router.get('/stock-status', protect, async (req, res) => {
   try {
-    const lowStock = await Part.count({
+    const outOfStock = await Part.count({
       where: {
-        stock: { [Op.lt]: col('stock_min') },
+        stock: 0,
       },
     });
 
-    const overStock = await Part.count({
+    const lowStock = await Part.count({
       where: {
-        stock_max: { [Op.ne]: null },
-        stock: { [Op.gt]: col('stock_max') },
+        stock: {
+          [Op.gt]: 0,
+          [Op.lt]: col('stock_min'),
+        },
       },
     });
 
     const totalParts = await Part.count();
-    const normalStock = totalParts - lowStock - overStock;
+    const normalStock = totalParts - lowStock - outOfStock;
 
-    res.json({ lowStock, normalStock, overStock });
+    res.json({ outOfStock, lowStock, normalStock });
   } catch (error) {
     res.status(500).json({ message: 'Error fetching stock status data' });
   }
@@ -142,56 +189,6 @@ router.get('/', protect, async (req, res) => {
     res
       .status(500)
       .json({ message: 'Error fetching transactions', error: error.message });
-  }
-});
-
-// GET /api/dashboard/top-anomaly-suppliers
-router.get('/top-anomaly-suppliers', protect, async (req, res) => {
-  try {
-    const topN = req.query.limit || 10;
-
-    const results = await Transaction.findAll({
-      where: { trans_type: 'ANOMALY' },
-      attributes: [
-        [
-          sequelize.fn('COUNT', sequelize.fn('DISTINCT', sequelize.col('part_id'))),
-          'anomalyScore',
-        ],
-      ],
-      include: [
-        {
-          model: Part,
-          attributes: [],
-          required: true,
-          include: [
-            {
-              model: Supplier,
-              attributes: ['supplier_name'],
-              required: true,
-            },
-          ],
-        },
-      ],
-      group: ['Part->Supplier.id', 'Part->Supplier.supplier_name'],
-      order: [[sequelize.literal('"anomalyScore"'), 'DESC']],
-      limit: topN,
-      raw: true,
-      subQuery: false,
-    });
-
-    const supplierNames = results.map(
-      (item) => item['Part.Supplier.supplier_name']
-    );
-    const anomalyScores = results.map((item) =>
-      parseInt(item.anomalyScore, 10)
-    );
-
-    res.json({ supplierNames, anomalyScores });
-  } catch (error) {
-    res.status(500).json({
-      message: 'Error fetching top anomaly suppliers',
-      error: error.message,
-    });
   }
 });
 

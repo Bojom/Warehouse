@@ -1,214 +1,202 @@
 <template>
   <div class="attributes-view">
-    <h1>{{ $t('attributes.title') }}</h1>
-    <el-tabs v-model="activeTab" class="attribute-tabs">
+    <!-- Search Section -->
+    <el-card class="search-card">
+      <el-form :inline="true" @submit.prevent="handleSearch">
+        <el-form-item :label="$t('attributes.search_by_code')">
+          <el-input
+            v-model="searchQuery"
+            :placeholder="$t('attributes.enter_code_placeholder')"
+            clearable
+          />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="handleSearch" :loading="searchLoading">{{
+            $t('parts.search')
+          }}</el-button>
+        </el-form-item>
+      </el-form>
+    </el-card>
+
+    <el-tabs v-model="activeTab" type="border-card">
       <!-- Brands Tab -->
       <el-tab-pane :label="$t('attributes.brands')" name="brands">
-        <el-button type="primary" @click="openForm('brand')">{{ $t('attributes.addBrand') }}</el-button>
-        <el-table :data="brands" stripe class="attribute-table">
-          <el-table-column prop="name" :label="$t('attributes.name')"></el-table-column>
-          <el-table-column :label="$t('attributes.actions')" width="180">
-            <template #default="scope">
-              <el-button size="small" @click="openForm('brand', scope.row)">{{ $t('attributes.edit') }}</el-button>
-              <el-button size="small" type="danger" @click="handleDelete('brand', scope.row.id)">{{ $t('attributes.delete') }}</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+        <CrudTable
+          :title="$t('attributes.brands')"
+          :columns="brandColumns"
+          :fetch-data="fetchBrands"
+          :create-item="(data) => createOrUpdateItem('brands', data)"
+          :update-item="(id, data) => createOrUpdateItem('brands', data, id)"
+          :delete-item="(id) => deleteItem('brands', id)"
+          :form-fields="brandFormFields"
+        />
       </el-tab-pane>
 
       <!-- Models Tab -->
       <el-tab-pane :label="$t('attributes.models')" name="models">
-        <el-button type="primary" @click="openForm('model')">{{ $t('attributes.addModel') }}</el-button>
-        <el-table :data="models" stripe class="attribute-table">
-          <el-table-column prop="name" :label="$t('attributes.name')"></el-table-column>
-          <el-table-column prop="brand.name" :label="$t('attributes.brand')"></el-table-column>
-          <el-table-column :label="$t('attributes.actions')" width="180">
-            <template #default="scope">
-              <el-button size="small" @click="openForm('model', scope.row)">{{ $t('attributes.edit') }}</el-button>
-              <el-button size="small" type="danger" @click="handleDelete('model', scope.row.id)">{{ $t('attributes.delete') }}</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+        <CrudTable
+          :title="$t('attributes.models')"
+          :columns="modelColumns"
+          :fetch-data="fetchModels"
+          :create-item="(data) => createOrUpdateItem('models', data)"
+          :update-item="(id, data) => createOrUpdateItem('models', data, id)"
+          :delete-item="(id) => deleteItem('models', id)"
+          :form-fields="modelFormFields"
+          :select-options="{ brands: brandOptions }"
+        />
       </el-tab-pane>
 
       <!-- Part Types Tab -->
-      <el-tab-pane :label="$t('attributes.partTypes')" name="partTypes">
-        <el-button type="primary" @click="openForm('partType')">{{ $t('attributes.addPartType') }}</el-button>
-        <el-table :data="partTypes" stripe class="attribute-table">
-          <el-table-column prop="name" :label="$t('attributes.name')"></el-table-column>
-          <el-table-column prop="code" :label="$t('attributes.code')"></el-table-column>
-          <el-table-column :label="$t('attributes.actions')" width="180">
-            <template #default="scope">
-              <el-button size="small" @click="openForm('partType', scope.row)">{{ $t('attributes.edit') }}</el-button>
-              <el-button size="small" type="danger" @click="handleDelete('partType', scope.row.id)">{{ $t('attributes.delete') }}</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+      <el-tab-pane :label="$t('attributes.part_types')" name="partTypes">
+        <CrudTable
+          :title="$t('attributes.part_types')"
+          :columns="commonColumns"
+          :fetch-data="fetchPartTypes"
+          :create-item="(data) => createOrUpdateItem('part-types', data)"
+          :update-item="(id, data) => createOrUpdateItem('part-types', data, id)"
+          :delete-item="(id) => deleteItem('part-types', id)"
+          :form-fields="commonFormFields"
+        />
       </el-tab-pane>
 
       <!-- Colours Tab -->
       <el-tab-pane :label="$t('attributes.colours')" name="colours">
-        <el-button type="primary" @click="openForm('colour')">{{ $t('attributes.addColour') }}</el-button>
-        <el-table :data="colours" stripe class="attribute-table">
-          <el-table-column prop="name" :label="$t('attributes.name')"></el-table-column>
-          <el-table-column prop="code" :label="$t('attributes.code')"></el-table-column>
-          <el-table-column :label="$t('attributes.actions')" width="180">
-            <template #default="scope">
-              <el-button size="small" @click="openForm('colour', scope.row)">{{ $t('attributes.edit') }}</el-button>
-              <el-button size="small" type="danger" @click="handleDelete('colour', scope.row.id)">{{ $t('attributes.delete') }}</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
+        <CrudTable
+          :title="$t('attributes.colours')"
+          :columns="commonColumns"
+          :fetch-data="fetchColours"
+          :create-item="(data) => createOrUpdateItem('colours', data)"
+          :update-item="(id, data) => createOrUpdateItem('colours', data, id)"
+          :delete-item="(id) => deleteItem('colours', id)"
+          :form-fields="commonFormFields"
+        />
       </el-tab-pane>
     </el-tabs>
 
-    <!-- Generic Form Dialog -->
-    <el-dialog v-model="dialogVisible" :title="formTitle" width="30%">
-      <el-form :model="formData" ref="formRef" label-position="top">
-        <el-form-item v-if="currentType === 'model'" :label="$t('attributes.brand')" prop="brand_id" required>
-          <el-select v-model="formData.brand_id" :placeholder="$t('attributes.selectBrand')">
-            <el-option v-for="brand in brands" :key="brand.id" :label="brand.name" :value="brand.id"></el-option>
-          </el-select>
-        </el-form-item>
-        <el-form-item :label="$t('attributes.name')" prop="name" required>
-          <el-input v-model="formData.name"></el-input>
-        </el-form-item>
-        <el-form-item v-if="currentType === 'partType' || currentType === 'colour'" :label="$t('attributes.code')" prop="code" required>
-          <el-input v-model="formData.code"></el-input>
-        </el-form-item>
-      </el-form>
+    <!-- Search Results Dialog -->
+    <el-dialog v-model="resultsDialogVisible" :title="$t('attributes.search_results')" width="60%">
+      <div v-if="searchResults.length > 0">
+        <el-table :data="searchResults" border>
+          <el-table-column :label="$t('attributes.type')" prop="type" width="120"></el-table-column>
+          <el-table-column :label="$t('attributes.name')" prop="name"></el-table-column>
+          <el-table-column
+            :label="$t('attributes.brand')"
+            prop="Brand.name"
+          ></el-table-column>
+          <el-table-column :label="$t('attributes.code')" prop="code" width="120"></el-table-column>
+        </el-table>
+      </div>
+      <div v-else class="no-results">
+        <p>{{ $t('attributes.no_results_found') }}</p>
+      </div>
       <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="dialogVisible = false">{{ $t('attributes.cancel') }}</el-button>
-          <el-button type="primary" @click="handleSubmit">{{ $t('attributes.save') }}</el-button>
-        </span>
+        <el-button @click="resultsDialogVisible = false">{{ $t('attributes.close') }}</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
-import { useI18n } from 'vue-i18n'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import * as api from '@/api/dimensions.api.js'
+import { ref, onMounted, computed } from 'vue';
+import api from '@/utils/api';
+import CrudTable from '@/components/CrudTable.vue';
+import { searchByCode } from '@/api/dimensions.api';
+import { ElMessage } from 'element-plus';
 
-const { t } = useI18n()
+const activeTab = ref('brands');
+const brands = ref([]);
 
-const activeTab = ref('brands')
-const brands = ref([])
-const models = ref([])
-const partTypes = ref([])
-const colours = ref([])
+// --- Search State ---
+const searchQuery = ref('');
+const searchLoading = ref(false);
+const resultsDialogVisible = ref(false);
+const searchResults = ref([]);
 
-const dialogVisible = ref(false)
-const isEditMode = ref(false)
-const currentType = ref('')
-const currentId = ref(null)
-const formData = ref({})
-const formRef = ref(null)
+// --- Data Fetching Functions ---
+const fetchBrands = async () => api.get('/dimensions/brands');
+const fetchModels = async () => api.get('/dimensions/models');
+const fetchPartTypes = async () => api.get('/dimensions/part-types');
+const fetchColours = async () => api.get('/dimensions/colours');
 
-const formTitle = computed(() => {
-  const action = isEditMode.value ? t('attributes.edit') : t('attributes.add')
-  const type = t(`attributes.${currentType.value}`)
-  return `${action} ${type}`
-})
+// --- Generic CRUD Functions ---
+const createOrUpdateItem = (type, data, id) => {
+  const url = id ? `/dimensions/${type}/${id}` : `/dimensions/${type}`;
+  const method = id ? 'put' : 'post';
+  return api[method](url, data);
+};
 
-const fetchData = async () => {
+const deleteItem = (type, id) => {
+  return api.delete(`/dimensions/${type}/${id}`);
+};
+
+// --- Search Handler ---
+const handleSearch = async () => {
+  if (!searchQuery.value) return;
+  searchLoading.value = true;
   try {
-    const [brandsRes, modelsRes, partTypesRes, coloursRes] = await Promise.all([
-      api.getBrands(),
-      api.getModels(),
-      api.getPartTypes(),
-      api.getColours(),
-    ])
-    brands.value = brandsRes.data
-    // This is a bit of a hack to include brand name in model data for display
-    models.value = modelsRes.data.map(m => ({...m, brand: brands.value.find(b => b.id === m.brand_id)}))
-    partTypes.value = partTypesRes.data
-    colours.value = coloursRes.data
-  } catch (error) {
-    ElMessage.error(t('attributes.fetchError'))
+    const response = await searchByCode(searchQuery.value);
+    searchResults.value = response.data;
+    resultsDialogVisible.value = true;
+  } catch {
+    ElMessage.error('Search failed');
+  } finally {
+    searchLoading.value = false;
   }
-}
+};
 
-const openForm = (type, item = null) => {
-  currentType.value = type
-  isEditMode.value = !!item
-  if (item) {
-    currentId.value = item.id
-    formData.value = { ...item }
-  } else {
-    formData.value = { name: '', code: '', brand_id: null }
-  }
-  dialogVisible.value = true
-}
+// --- Table and Form Definitions ---
+const commonColumns = [
+  { prop: 'name', label: 'attributes.name' },
+  { prop: 'code', label: 'attributes.code' },
+];
 
-const handleSubmit = async () => {
+const brandColumns = [...commonColumns];
+
+const modelColumns = [
+  { prop: 'Brand.name', label: 'attributes.brand' }, // Use singular 'brand'
+  { prop: 'name', label: 'attributes.name' },
+  { prop: 'code', label: 'attributes.code' },
+];
+
+const commonFormFields = [
+  { name: 'name', label: 'attributes.name', type: 'text', required: true },
+  { name: 'code', label: 'attributes.code', type: 'text', required: true },
+];
+
+const brandFormFields = [...commonFormFields];
+
+const brandOptions = computed(() =>
+  brands.value.map(b => ({ label: b.name, value: b.id }))
+);
+
+const modelFormFields = [
+  { name: 'brand_id', label: 'attributes.brand', type: 'select', options: brandOptions, required: true },
+  { name: 'name', label: 'attributes.name', type: 'text', required: true },
+  { name: 'code', label: 'attributes.code', type: 'text', required: true },
+];
+
+
+// Fetch brands on mount to populate the select dropdown in the models form
+onMounted(async () => {
   try {
-    await formRef.value.validate()
-    const apiMap = {
-      brand: isEditMode.value ? api.updateBrand : api.createBrand,
-      model: isEditMode.value ? api.updateModel : api.createModel,
-      partType: isEditMode.value ? api.updatePartType : api.createPartType,
-      colour: isEditMode.value ? api.updateColour : api.createColour,
+    const response = await fetchBrands();
+    brands.value = response.data;
+  } catch {
+    ElMessage.error('Failed to fetch brands for model form');
     }
-    const callApi = apiMap[currentType.value]
-    const payload = { ...formData.value }
-    delete payload.brand // remove joined data before sending
-
-    if (isEditMode.value) {
-      await callApi(currentId.value, payload)
-    } else {
-      await callApi(payload)
-    }
-
-    ElMessage.success(t('attributes.saveSuccess'))
-    dialogVisible.value = false
-    fetchData()
-  } catch (error) {
-     if (error === false) return // Form validation failed
-     ElMessage.error(t('attributes.saveError'))
-  }
-}
-
-const handleDelete = async (type, id) => {
-  try {
-    await ElMessageBox.confirm(
-      t('attributes.deleteConfirm'),
-      t('attributes.warning'),
-      {
-        confirmButtonText: t('attributes.ok'),
-        cancelButtonText: t('attributes.cancel'),
-        type: 'warning',
-      }
-    )
-
-    const apiMap = {
-      brand: api.deleteBrand,
-      model: api.deleteModel,
-      partType: api.deletePartType,
-      colour: api.deleteColour,
-    }
-    await apiMap[type](id)
-
-    ElMessage.success(t('attributes.deleteSuccess'))
-    fetchData()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error(t('attributes.deleteError'))
-    }
-  }
-}
-
-onMounted(fetchData)
+});
 </script>
 
 <style scoped>
 .attributes-view {
   padding: 20px;
 }
-.attribute-table {
-  margin-top: 20px;
+.search-card {
+  margin-bottom: 20px;
+}
+.no-results {
+  text-align: center;
+  color: #909399;
+  padding: 20px;
 }
 </style>

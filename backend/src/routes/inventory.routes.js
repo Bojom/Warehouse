@@ -5,7 +5,6 @@ const { Op, Sequelize } = require('sequelize');
 const Part = require('../models/part.model');
 const Supplier = require('../models/supplier.model');
 const { protect } = require('../middleware/auth.middleware');
-const { sequelize } = require('sequelize');
 
 // Apply authentication middleware to all routes in this file
 router.use(protect);

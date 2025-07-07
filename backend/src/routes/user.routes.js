@@ -79,7 +79,7 @@ router.post('/login', async (req, res) => {
     // 3. password matches, generate JWT
     const payload = {
       id: user.id,
-      username: user.user_name,
+      user_name: user.user_name,
       role: user.user_role,
     };
 
@@ -113,7 +113,7 @@ router.get('/profile', protect, async (req, res) => {
     if (user) {
       const userProfile = {
         id: user.id,
-        username: user.user_name,
+        user_name: user.user_name,
         role: user.user_role,
       };
       res.json({ userProfile });

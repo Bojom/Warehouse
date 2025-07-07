@@ -73,11 +73,32 @@ const fetchInventoryDetails = async () => {
   }
 }
 
+const inventoryWithStatus = computed(() => {
+  return inventoryList.value.map((item) => {
+    let status = 'normal'
+    if (item.stock === 0) {
+      status = 'out_of_stock'
+    } else if (item.stock < item.stock_min) {
+      status = 'low_stock'
+    } else if (item.stock > item.stock_max && item.stock_max > 0) {
+      status = 'over_stock'
+    }
+    return {
+      ...item,
+      status,
+      // a more readable format for the stock numbers
+      current_stock: item.stock,
+      min_stock: item.stock_min,
+      max_stock: item.stock_max,
+    }
+  })
+})
+
 const filteredInventory = computed(() => {
   if (filterStatus.value === 'all') {
-    return inventoryList.value
+    return inventoryWithStatus.value
   }
-  return inventoryList.value.filter((item) => item.status === filterStatus.value)
+  return inventoryWithStatus.value.filter((item) => item.status === filterStatus.value)
 })
 
 onMounted(() => {

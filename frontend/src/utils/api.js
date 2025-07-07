@@ -6,9 +6,12 @@ import { ElMessage } from 'element-plus'
 // 1. create a new Axios instance
 const api = axios.create({
   // configure the base URL, all requests will automatically add this prefix
-  baseURL: import.meta.env.VITE_API_BASE_URL,
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api',
   // set the request timeout
   timeout: 10000,
+  headers: {
+    'Content-Type': 'application/json',
+  },
 })
 
 // 2. add request interceptor (Request Interceptor)
@@ -21,6 +24,7 @@ api.interceptors.request.use(
       // 'Bearer ' is a standard prefix, followed by your token
       config.headers['Authorization'] = 'Bearer ' + token
     }
+
     return config
   },
   (error) => {
